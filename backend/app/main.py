@@ -1,6 +1,6 @@
 """FastAPI application main module."""
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, Path as PathParam
+from datetime import datetime, date
+from fastapi import FastAPI, HTTPException, Path as PathParam, Query
 import pandas as pd
 
 from .schemas import (
@@ -11,11 +11,18 @@ from .schemas import (
     RecommendationMeta,
     TagTimeseriesResponse,
     TimeseriesPoint,
-    TagsListResponse
+    TagsListResponse,
+    TrendInput, 
+    TrendOutput, ActionStepPlanOutput,
+    ProfitabilityType, GenresTrendDataOutput,
+    DeepDataInput, DeepDataOutput
 )
 from .recommender import recommend_tags
-from .storage import load_tag_summary, load_tag_month_stats
-
+from .storage import load_tag_summary, load_tag_month_stats, load_tag_summary, load_tag_month_stats, load_games
+from .ml_mock import mock_predict_tags
+from .llm_service import generate_trend_response
+from .response_store import save_trend_response, get_trend_response
+from .analytics import compute_genres_trend_data, compute_deep_data
 
 app = FastAPI(
     title="Steam Tag Recommender API",

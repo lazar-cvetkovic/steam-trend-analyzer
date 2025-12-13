@@ -25,8 +25,15 @@ class Settings(BaseSettings):
     W_TREND: float = 0.7
     W_SATURATION: float = 0.15
     DEFAULT_COMPLEXITY: int = 3
+
+    # LLM (Perplexity) - optional
+    PERPLEXITY_API_KEY: str = ""  # Set via environment variable PERPLEXITY_API_KEY or .env file
+    PERPLEXITY_MODEL: str = "sonar-reasoning"
+    PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai"
     
     class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
 
 
