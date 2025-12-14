@@ -155,84 +155,99 @@ async def get_trend(
     revenueExpectedInThousandsOfDollars: int = Query(..., ge=0, le=100000),
 ):
     try:
-        tag_summary = load_tag_summary()
-        all_tags = sorted(tag_summary["tag"].astype(str).str.strip().unique().tolist())
+        # Wrap entire endpoint in timeout to prevent hanging
+        async def _process_trend():
+            # Load tag summary in thread pool to avoid blocking
+            tag_summary = await asyncio.to_thread(load_tag_summary)
+            all_tags = sorted(tag_summary["tag"].astype(str).str.strip().unique().tolist())
 
-        ml_top = mock_predict_tags(
-            preferred_genres=preferredGenres,
-            all_known_tags=all_tags,
-            team_size=teamSize,
-            commercial_games_built_count=commercialGamesBuiltCount,
-            art_heavy_level=artHeavyLevel,
-            max_dev_months=maxDevelopmentTimeInMonths,
-            revenue_expected_k=revenueExpectedInThousandsOfDollars,
-            top_n=10
-        )
-
-        primary_tag = ml_top[0][0] if ml_top else (all_tags[0] if all_tags else "Indie")
-
-        games = load_games()
-
-        # Deep data for primary tag (wide filters by default; keep it useful)
-        today = date.today()
-        default_start = date(2019, 1, 1)
-        deep = compute_deep_data(
-            games=games,
-            tags=[primary_tag],
-            wishlist_min=0, wishlist_max=2_000_000_000,
-            revenue_min=0, revenue_max=2_000_000_000,
-            reviews_min=0, reviews_max=2_000_000_000,
-            start=default_start,
-            end=today
-        )
-
-        # Trend data for primary tag (profitability by wishlists default threshold 1000)
-        released_points, profitable_points, ratio_points, total_rel, total_prof = compute_genres_trend_data(
-            games=games,
-            start=default_start,
-            end=today,
-            profitability_type="wishlists",
-            min_number_for_profitability=1000
-        )
-
-        ml_lines = "\n".join([f"- {t}: {p:.3f}" for t, p in ml_top])
-
-        prompt = (
-            f"User constraints:\n"
-            f"- teamSize={teamSize}\n"
-            f"- preferredGenres={preferredGenres}\n"
-            f"- commercialGamesBuiltCount={commercialGamesBuiltCount}\n"
-            f"- artHeavyLevel={artHeavyLevel}\n"
-            f"- maxDevelopmentTimeInMonths={maxDevelopmentTimeInMonths}\n"
-            f"- revenueExpectedInThousandsOfDollars={revenueExpectedInThousandsOfDollars}\n\n"
-            f"ML predicted tags (mocked):\n{ml_lines}\n\n"
-            f"Primary tag chosen for deep dive: {primary_tag}\n\n"
-            f"Deep data summary (primary tag slice):\n{deep}\n\n"
-            f"Overall market trend stats (all games, wishlists>=1000):\n"
-            f"- released_points={released_points[-12:]}\n"
-            f"- profitable_points={profitable_points[-12:]}\n"
-            f"- ratio_points={ratio_points[-12:]}\n"
-            f"- totalReleased={total_rel}, totalProfitable={total_prof}\n"
-        )
-
-        # Call LLM with timeout to prevent hanging
-        try:
-            llm = await asyncio.wait_for(
-                generate_trend_response(prompt, timeout=25.0),
-                timeout=30.0
+            # ML prediction (fast, can stay synchronous)
+            ml_top = mock_predict_tags(
+                preferred_genres=preferredGenres,
+                all_known_tags=all_tags,
+                team_size=teamSize,
+                commercial_games_built_count=commercialGamesBuiltCount,
+                art_heavy_level=artHeavyLevel,
+                max_dev_months=maxDevelopmentTimeInMonths,
+                revenue_expected_k=revenueExpectedInThousandsOfDollars,
+                top_n=10
             )
+
+            primary_tag = ml_top[0][0] if ml_top else (all_tags[0] if all_tags else "Indie")
+
+            # Load games in thread pool to avoid blocking
+            games = await asyncio.to_thread(load_games)
+
+            # Deep data for primary tag (wide filters by default; keep it useful)
+            today = date.today()
+            default_start = date(2019, 1, 1)
+            
+            # Run compute operations in parallel in thread pool
+            deep_task = asyncio.to_thread(
+                compute_deep_data,
+                games=games,
+                tags=[primary_tag],
+                wishlist_min=0, wishlist_max=2_000_000_000,
+                revenue_min=0, revenue_max=2_000_000_000,
+                reviews_min=0, reviews_max=2_000_000_000,
+                start=default_start,
+                end=today
+            )
+            
+            trend_task = asyncio.to_thread(
+                compute_genres_trend_data,
+                games=games,
+                start=default_start,
+                end=today,
+                profitability_type="wishlists",
+                min_number_for_profitability=1000
+            )
+            
+            # Wait for both to complete in parallel
+            deep, (released_points, profitable_points, ratio_points, total_rel, total_prof) = await asyncio.gather(
+                deep_task, trend_task
+            )
+
+            ml_lines = "\n".join([f"- {t}: {p:.3f}" for t, p in ml_top])
+
+            prompt = (
+                f"User constraints:\n"
+                f"- teamSize={teamSize}\n"
+                f"- preferredGenres={preferredGenres}\n"
+                f"- commercialGamesBuiltCount={commercialGamesBuiltCount}\n"
+                f"- artHeavyLevel={artHeavyLevel}\n"
+                f"- maxDevelopmentTimeInMonths={maxDevelopmentTimeInMonths}\n"
+                f"- revenueExpectedInThousandsOfDollars={revenueExpectedInThousandsOfDollars}\n\n"
+                f"ML predicted tags (mocked):\n{ml_lines}\n\n"
+                f"Primary tag chosen for deep dive: {primary_tag}\n\n"
+                f"Deep data summary (primary tag slice):\n{deep}\n\n"
+                f"Overall market trend stats (all games, wishlists>=1000):\n"
+                f"- released_points={released_points[-12:]}\n"
+                f"- profitable_points={profitable_points[-12:]}\n"
+                f"- ratio_points={ratio_points[-12:]}\n"
+                f"- totalReleased={total_rel}, totalProfitable={total_prof}\n"
+            )
+
+            # Call LLM with timeout to prevent hanging
+            llm = await generate_trend_response(prompt, timeout=25.0)
+            
+            rec = save_trend_response(chat_response=llm.full_text, action_step_plan=llm.action_plan_text)
+
+            return TrendOutput(chat=rec.chat_response, response_id=rec.response_id)
+
+        # Overall timeout for entire endpoint (120 seconds - increased for large datasets)
+        try:
+            return await asyncio.wait_for(_process_trend(), timeout=120.0)
         except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=504,
-                detail="LLM service timeout. Please try again later."
+                detail="Request timeout. The operation took too long. Please try again later."
             )
-        
-        rec = save_trend_response(chat_response=llm.full_text, action_step_plan=llm.action_plan_text)
-
-        return TrendOutput(chat=rec.chat_response, response_id=rec.response_id)
 
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
