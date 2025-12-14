@@ -1,7 +1,7 @@
 """Data storage layer with caching."""
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import pandas as pd
 from .settings import settings
 
@@ -11,6 +11,38 @@ _tag_summary_cache: Optional[pd.DataFrame] = None
 _tag_month_stats_cache: Optional[pd.DataFrame] = None
 _tag_complexity_cache: Optional[Dict[str, int]] = None
 _games_cache: Optional[pd.DataFrame] = None
+_market_archetypes_cache: Optional[list[dict]] = None
+_combo_clusters_cache: Optional[pd.DataFrame] = None
+
+def load_tag_combo_clusters() -> pd.DataFrame:
+    """
+    Load clustered tag combinations (HDBSCAN output) with in-memory caching.
+    """
+    global _combo_clusters_cache
+
+    path = settings.PROCESSED_DIR / "tag_combo_clusters.parquet"
+
+    if _combo_clusters_cache is None:
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Tag combo clusters not found at {path}. "
+                "Run:\n"
+                "  python scripts/build_tag_combo_summary.py\n"
+                "  python scripts/cluster_tag_combinations.py"
+            )
+        _combo_clusters_cache = pd.read_parquet(path)
+
+    return _combo_clusters_cache.copy()
+
+def load_market_archetypes() -> list[dict]:
+    global _market_archetypes_cache
+    path = settings.PROCESSED_DIR / "market_archetypes.json"
+    if _market_archetypes_cache is None:
+        if not path.exists():
+            raise FileNotFoundError("market_archetypes.json not found")
+        with open(path, "r", encoding="utf-8") as f:
+            _market_archetypes_cache = json.load(f)
+    return _market_archetypes_cache
 
 def load_tag_summary() -> pd.DataFrame:
     """Load tag summary parquet file with caching."""

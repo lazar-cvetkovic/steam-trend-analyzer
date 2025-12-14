@@ -2,7 +2,7 @@
 Analyze clustered tag combinations
 and extract actionable market archetypes.
 """
-
+import json
 import sys
 from pathlib import Path
 import pandas as pd
@@ -87,6 +87,42 @@ def main():
     print("\n" + "=" * 60)
     print("Cluster analysis complete")
 
+    # ---------------------------------------------------------
+    # EXPORT MARKET ARCHETYPES (FINAL ML INPUT)
+    # ---------------------------------------------------------
+    archetypes = []
+
+    for cluster_id in candidates.index:
+        cluster_row = cluster_stats.loc[cluster_id]
+
+        top_combos = (
+            df[df["cluster"] == cluster_id]
+            .sort_values("risk_ratio")
+            .head(TOP_COMBOS_PER_CLUSTER)
+        )
+
+        archetypes.append({
+            "cluster_id": int(cluster_id),
+            "combos_count": int(cluster_row["combos"]),
+            "avg_risk": float(cluster_row["avg_risk"]),
+            "avg_trend": float(cluster_row["avg_trend"]),
+            "avg_publisher_dependency": float(cluster_row["avg_publisher_dep"]),
+            "avg_combo_size": float(cluster_row["avg_combo_size"]),
+            "top_tag_combinations": [
+                {
+                    "tags": row["tag_combo"],
+                    "risk": float(row["risk_ratio"]),
+                    "trend": float(row["trend_delta"])
+                }
+                for _, row in top_combos.iterrows()
+            ]
+        })
+
+    out_path = settings.PROCESSED_DIR / "market_archetypes.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(archetypes, f, indent=2)
+
+    print(f"\n[OK] Saved market archetypes to {out_path}")
 
 if __name__ == "__main__":
     main()

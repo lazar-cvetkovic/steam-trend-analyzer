@@ -20,34 +20,45 @@ def mock_predict_tags(
     Returns list of (tag, probability) where probabilities sum to 1.0 (approximately).
     Deterministic for same inputs.
     """
-    base = preferred_genres[:] if preferred_genres else []
-    base = [t.strip() for t in base if t and t.strip()]
-    base_lower = {t.lower() for t in base}
+    archetypes = load_market_archetypes()
 
-    candidates = []
-    for t in all_known_tags:
-        if not t or not str(t).strip():
-            continue
-        if str(t).strip().lower() in base_lower:
-            candidates.append(str(t).strip())
+    preferred = {t.lower().strip() for t in preferred_genres if t}
 
-    fallback = [t for t in all_known_tags if str(t).strip().lower() not in base_lower]
-    seed = _seed_from_inputs(
-        ",".join(sorted(base_lower)),
-        str(team_size),
-        str(commercial_games_built_count),
-        str(art_heavy_level),
-        str(max_dev_months),
-        str(revenue_expected_k),
-    )
-    rng = random.Random(seed)
-    rng.shuffle(fallback)
+    scored = []
 
-    merged = candidates + fallback
-    picked = merged[:max(top_n, 10)]
+    for arch in archetypes:
+        score = 0.0
 
-    raw = [rng.random() for _ in picked]
-    s = sum(raw) if sum(raw) > 0 else 1.0
-    probs = [v / s for v in raw]
+        score += max(0.0, 5.0 - arch["avg_risk"])
 
-    return list(zip(picked[:top_n], probs[:top_n]))
+        score += arch["avg_trend"] * 2.0
+
+        if team_size <= 3 and arch["avg_combo_size"] > 2:
+            score -= 1.0
+
+        if art_heavy_level >= 7:
+            score -= arch["avg_combo_size"] * 0.5
+
+        if commercial_games_built_count == 0:
+            score -= arch["avg_publisher_dependency"] * 2.0
+
+        for combo in arch["top_tag_combinations"]:
+            tags = combo["tags"].split(",")
+            if any(t.strip().lower() in preferred for t in tags):
+                score += 1.5
+
+        scored.append((arch, score))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    results = []
+    for arch, s in scored:
+        for combo in arch["top_tag_combinations"]:
+            results.append((combo["tags"], float(s)))
+            if len(results) >= top_n:
+                break
+        if len(results) >= top_n:
+            break
+
+    total = sum(v for _, v in results) or 1.0
+    return [(t, v / total) for t, v in results]

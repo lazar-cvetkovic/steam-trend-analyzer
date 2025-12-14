@@ -15,10 +15,14 @@ from .schemas import (
     TrendInput, 
     TrendOutput, ActionStepPlanOutput,
     ProfitabilityType, GenresTrendDataOutput,
-    DeepDataInput, DeepDataOutput
+    DeepDataInput, DeepDataOutput,
+    ClusterListResponse,
+    ClusterDetailResponse,
+    ClusterSummary,
+    TagComboItem
 )
 from .recommender import recommend_tags
-from .storage import load_tag_summary, load_tag_month_stats, load_tag_summary, load_tag_month_stats, load_games
+from .storage import load_tag_summary, load_tag_month_stats, load_tag_summary, load_tag_month_stats, load_games, load_tag_combo_clusters
 from .ml_mock import mock_predict_tags
 from .llm_service import generate_trend_response
 from .response_store import save_trend_response, get_trend_response
@@ -291,3 +295,82 @@ async def get_deep_data(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@app.get("/market-archetypes", response_model=ClusterListResponse)
+async def get_market_archetypes(
+    min_combos: int = Query(15, ge=1),
+    max_avg_risk: float = Query(4.0, ge=0),
+    min_trend: float = Query(0.0),
+    max_publisher_dep: float = Query(0.65)
+):
+    df = load_tag_combo_clusters()
+
+    summary = (
+        df[df["cluster"] != -1]
+        .groupby("cluster")
+        .agg(
+            combos=("tag_combo", "count"),
+            avg_risk=("risk_ratio", "mean"),
+            avg_trend=("trend_delta", "mean"),
+            avg_publisher_dep=("publisher_dependency", "mean"),
+            avg_combo_size=("combo_size", "mean"),
+        )
+        .reset_index()
+    )
+
+    filtered = summary[
+        (summary["combos"] >= min_combos) &
+        (summary["avg_risk"] <= max_avg_risk) &
+        (summary["avg_trend"] >= min_trend) &
+        (summary["avg_publisher_dep"] <= max_publisher_dep)
+    ].sort_values("avg_risk")
+
+    return ClusterListResponse(
+        clusters=[
+            ClusterSummary(
+                cluster_id=int(r.cluster),
+                combos=int(r.combos),
+                avg_risk=float(r.avg_risk),
+                avg_trend=float(r.avg_trend),
+                avg_publisher_dep=float(r.avg_publisher_dep),
+                avg_combo_size=float(r.avg_combo_size),
+            )
+            for _, r in filtered.iterrows()
+        ]
+    )
+
+@app.get("/market-archetypes/{cluster_id}", response_model=ClusterDetailResponse)
+async def get_market_archetype(cluster_id: int, top_n: int = Query(15, ge=1, le=100)):
+    df = load_tag_combo_clusters()
+
+    cluster_df = df[df["cluster"] == cluster_id]
+    if cluster_df.empty:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    summary = ClusterSummary(
+        cluster_id=cluster_id,
+        combos=len(cluster_df),
+        avg_risk=float(cluster_df["risk_ratio"].mean()),
+        avg_trend=float(cluster_df["trend_delta"].mean()),
+        avg_publisher_dep=float(cluster_df["publisher_dependency"].mean()),
+        avg_combo_size=float(cluster_df["combo_size"].mean()),
+    )
+
+    top = (
+        cluster_df
+        .sort_values("risk_ratio")
+        .head(top_n)
+    )
+
+    return ClusterDetailResponse(
+        cluster=summary,
+        top_combinations=[
+            TagComboItem(
+                tag_combo=row.tag_combo,
+                risk_ratio=float(row.risk_ratio),
+                trend_delta=float(row.trend_delta),
+                publisher_dependency=float(row.publisher_dependency),
+                combo_size=int(row.combo_size),
+            )
+            for _, row in top.iterrows()
+        ]
+    )

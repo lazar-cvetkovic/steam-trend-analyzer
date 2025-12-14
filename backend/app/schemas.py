@@ -131,3 +131,33 @@ class DeepDataOutput(BaseModel):
     multiplayerSupportPercentage: float
     steamLeaderboardSupportPercentage: float
     steamAchievementsSupportPercentage: float
+
+
+# -------------------------
+# CLUSTER / MARKET MODELS
+# -------------------------
+
+class TagComboItem(BaseModel):
+    tag_combo: str
+    risk_ratio: float
+    trend_delta: float
+    publisher_dependency: float
+    combo_size: int
+
+
+class ClusterSummary(BaseModel):
+    cluster_id: int
+    combos: int
+    avg_risk: float
+    avg_trend: float
+    avg_publisher_dep: float
+    avg_combo_size: float
+
+
+class ClusterListResponse(BaseModel):
+    clusters: list[ClusterSummary]
+
+
+class ClusterDetailResponse(BaseModel):
+    cluster: ClusterSummary
+    top_combinations: list[TagComboItem]

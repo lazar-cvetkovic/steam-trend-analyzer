@@ -1,0 +1,302 @@
+[
+  {
+    "cluster_id": 87,
+    "combos_count": 132,
+    "avg_risk": 3.0575833333333335,
+    "avg_trend": 0.4654848484848485,
+    "avg_publisher_dependency": 0.5856136363636364,
+    "avg_combo_size": 2.0,
+    "top_tag_combinations": [
+      {
+        "tags": "sexual content,romance",
+        "risk": 1.283,
+        "trend": 0.221
+      },
+      {
+        "tags": "strategy,cold war",
+        "risk": 1.609,
+        "trend": 0.113
+      },
+      {
+        "tags": "driving,management",
+        "risk": 1.705,
+        "trend": 0.618
+      },
+      {
+        "tags": "souls-like,metroidvania",
+        "risk": 1.728,
+        "trend": -0.619
+      },
+      {
+        "tags": "grand strategy,strategy",
+        "risk": 1.73,
+        "trend": 0.902
+      },
+      {
+        "tags": "simulation,job simulator",
+        "risk": 1.755,
+        "trend": 0.41
+      },
+      {
+        "tags": "multiplayer,stealth",
+        "risk": 1.793,
+        "trend": -0.644
+      },
+      {
+        "tags": "colony sim,resource management",
+        "risk": 1.796,
+        "trend": -0.561
+      },
+      {
+        "tags": "sandbox,city builder",
+        "risk": 1.808,
+        "trend": -0.409
+      },
+      {
+        "tags": "crafting,relaxing",
+        "risk": 1.81,
+        "trend": 0.56
+      }
+    ]
+  },
+  {
+    "cluster_id": 60,
+    "combos_count": 16,
+    "avg_risk": 3.2290625,
+    "avg_trend": 1.1849375,
+    "avg_publisher_dependency": 0.291375,
+    "avg_combo_size": 2.0,
+    "top_tag_combinations": [
+      {
+        "tags": "choices matter,horror",
+        "risk": 1.956,
+        "trend": 0.854
+      },
+      {
+        "tags": "zombies,co-op",
+        "risk": 2.01,
+        "trend": 1.287
+      },
+      {
+        "tags": "driving,transportation",
+        "risk": 2.295,
+        "trend": 1.537
+      },
+      {
+        "tags": "top-down,survival",
+        "risk": 2.553,
+        "trend": 1.508
+      },
+      {
+        "tags": "psychological horror,online co-op",
+        "risk": 2.57,
+        "trend": 0.982
+      },
+      {
+        "tags": "cute,horror",
+        "risk": 2.78,
+        "trend": 1.02
+      },
+      {
+        "tags": "horror,roguelike",
+        "risk": 2.856,
+        "trend": 1.408
+      },
+      {
+        "tags": "psychological horror,cinematic",
+        "risk": 2.984,
+        "trend": 0.8
+      },
+      {
+        "tags": "atmospheric,choices matter",
+        "risk": 3.033,
+        "trend": 1.478
+      },
+      {
+        "tags": "management,relaxing",
+        "risk": 3.183,
+        "trend": 1.435
+      }
+    ]
+  },
+  {
+    "cluster_id": 78,
+    "combos_count": 71,
+    "avg_risk": 3.38043661971831,
+    "avg_trend": 0.4560140845070423,
+    "avg_publisher_dependency": 0.4219718309859155,
+    "avg_combo_size": 2.0,
+    "top_tag_combinations": [
+      {
+        "tags": "roguelite,co-op",
+        "risk": 1.653,
+        "trend": 0.512
+      },
+      {
+        "tags": "dating sim,first-person",
+        "risk": 1.764,
+        "trend": 0.186
+      },
+      {
+        "tags": "life sim,dating sim",
+        "risk": 1.848,
+        "trend": 0.942
+      },
+      {
+        "tags": "action roguelike,multiplayer",
+        "risk": 1.884,
+        "trend": 0.736
+      },
+      {
+        "tags": "survival horror,female protagonist",
+        "risk": 1.887,
+        "trend": 0.66
+      },
+      {
+        "tags": "turn-based combat,fantasy",
+        "risk": 1.979,
+        "trend": 0.56
+      },
+      {
+        "tags": "sandbox,farming sim",
+        "risk": 1.993,
+        "trend": -0.081
+      },
+      {
+        "tags": "psychological horror,psychedelic",
+        "risk": 1.998,
+        "trend": 0.784
+      },
+      {
+        "tags": "co-op,puzzle",
+        "risk": 2.054,
+        "trend": 0.582
+      },
+      {
+        "tags": "pixel graphics,dark fantasy",
+        "risk": 2.096,
+        "trend": 0.416
+      }
+    ]
+  },
+  {
+    "cluster_id": 89,
+    "combos_count": 43,
+    "avg_risk": 3.4315348837209303,
+    "avg_trend": 0.7573255813953488,
+    "avg_publisher_dependency": 0.5,
+    "avg_combo_size": 2.0,
+    "top_tag_combinations": [
+      {
+        "tags": "base building,multiplayer",
+        "risk": 1.757,
+        "trend": 0.504
+      },
+      {
+        "tags": "management,medieval",
+        "risk": 1.759,
+        "trend": 1.037
+      },
+      {
+        "tags": "medieval,open world",
+        "risk": 1.857,
+        "trend": 0.903
+      },
+      {
+        "tags": "farming sim,management",
+        "risk": 2.012,
+        "trend": 0.825
+      },
+      {
+        "tags": "horror,dark humor",
+        "risk": 2.092,
+        "trend": 0.35
+      },
+      {
+        "tags": "war,historical",
+        "risk": 2.221,
+        "trend": 0.807
+      },
+      {
+        "tags": "1990's,story rich",
+        "risk": 2.23,
+        "trend": 0.88
+      },
+      {
+        "tags": "online co-op,character customization",
+        "risk": 2.241,
+        "trend": 0.435
+      },
+      {
+        "tags": "rpg,emotional",
+        "risk": 2.265,
+        "trend": 0.694
+      },
+      {
+        "tags": "sexual content,lgbtq+",
+        "risk": 2.274,
+        "trend": 1.047
+      }
+    ]
+  },
+  {
+    "cluster_id": 58,
+    "combos_count": 21,
+    "avg_risk": 3.613809523809524,
+    "avg_trend": 0.5001904761904762,
+    "avg_publisher_dependency": 0.2623809523809524,
+    "avg_combo_size": 2.0,
+    "top_tag_combinations": [
+      {
+        "tags": "turn-based,party-based rpg",
+        "risk": 1.469,
+        "trend": 0.582
+      },
+      {
+        "tags": "character customization,simulation",
+        "risk": 1.506,
+        "trend": 0.331
+      },
+      {
+        "tags": "bullet hell,dark fantasy",
+        "risk": 1.697,
+        "trend": 0.401
+      },
+      {
+        "tags": "choices matter,indie",
+        "risk": 1.94,
+        "trend": 0.169
+      },
+      {
+        "tags": "automation,management",
+        "risk": 2.075,
+        "trend": 0.433
+      },
+      {
+        "tags": "cooking,time management",
+        "risk": 2.28,
+        "trend": 0.431
+      },
+      {
+        "tags": "atmospheric,point & click",
+        "risk": 2.378,
+        "trend": 0.481
+      },
+      {
+        "tags": "open world survival craft,adventure",
+        "risk": 2.478,
+        "trend": 0.301
+      },
+      {
+        "tags": "base building,survival",
+        "risk": 2.623,
+        "trend": 0.587
+      },
+      {
+        "tags": "music,action",
+        "risk": 2.72,
+        "trend": 0.682
+      }
+    ]
+  }
+]
