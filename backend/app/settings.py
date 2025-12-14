@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # LLM (Perplexity) - optional
     PERPLEXITY_API_KEY: str = ""  # Set via environment variable PERPLEXITY_API_KEY or .env file
-    PERPLEXITY_MODEL: str = "sonar-reasoning"
+    PERPLEXITY_MODEL: str = "sonar-pro"
     PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai"
     
     class Config:

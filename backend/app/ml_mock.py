@@ -1,6 +1,7 @@
 import hashlib
 import random
 from typing import List, Tuple
+from .storage import load_market_archetypes
 
 def _seed_from_inputs(*parts: str) -> int:
     h = hashlib.sha256(("|".join(parts)).encode("utf-8")).hexdigest()

@@ -1,10 +1,10 @@
 [
   {
-    "cluster_id": 87,
-    "combos_count": 132,
-    "avg_risk": 3.0575833333333335,
-    "avg_trend": 0.4654848484848485,
-    "avg_publisher_dependency": 0.5856136363636364,
+    "cluster_id": 88,
+    "combos_count": 102,
+    "avg_risk": 3.053509803921569,
+    "avg_trend": 0.26094117647058823,
+    "avg_publisher_dependency": 0.5891372549019608,
     "avg_combo_size": 2.0,
     "top_tag_combinations": [
       {
@@ -26,11 +26,6 @@
         "tags": "souls-like,metroidvania",
         "risk": 1.728,
         "trend": -0.619
-      },
-      {
-        "tags": "grand strategy,strategy",
-        "risk": 1.73,
-        "trend": 0.902
       },
       {
         "tags": "simulation,job simulator",
@@ -56,11 +51,16 @@
         "tags": "crafting,relaxing",
         "risk": 1.81,
         "trend": 0.56
+      },
+      {
+        "tags": "dating sim,adventure",
+        "risk": 1.813,
+        "trend": 0.311
       }
     ]
   },
   {
-    "cluster_id": 60,
+    "cluster_id": 57,
     "combos_count": 16,
     "avg_risk": 3.2290625,
     "avg_trend": 1.1849375,
@@ -120,11 +120,11 @@
     ]
   },
   {
-    "cluster_id": 78,
-    "combos_count": 71,
-    "avg_risk": 3.38043661971831,
-    "avg_trend": 0.4560140845070423,
-    "avg_publisher_dependency": 0.4219718309859155,
+    "cluster_id": 73,
+    "combos_count": 70,
+    "avg_risk": 3.3671285714285717,
+    "avg_trend": 0.4538285714285714,
+    "avg_publisher_dependency": 0.42228571428571426,
     "avg_combo_size": 2.0,
     "top_tag_combinations": [
       {
@@ -180,7 +180,7 @@
     ]
   },
   {
-    "cluster_id": 89,
+    "cluster_id": 84,
     "combos_count": 43,
     "avg_risk": 3.4315348837209303,
     "avg_trend": 0.7573255813953488,
@@ -240,7 +240,7 @@
     ]
   },
   {
-    "cluster_id": 58,
+    "cluster_id": 55,
     "combos_count": 21,
     "avg_risk": 3.613809523809524,
     "avg_trend": 0.5001904761904762,

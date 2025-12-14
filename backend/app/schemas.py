@@ -72,8 +72,10 @@ class TrendInput(BaseModel):
     revenueExpectedInThousandsOfDollars: int = Field(ge=0, le=100000)
 
 class TrendOutput(BaseModel):
-    chat: str
-    response_id: int
+    success: bool
+    chatName: str
+    chatResponse: str 
+    responseId: int
 
 class ActionStepPlanOutput(BaseModel):
     text: str

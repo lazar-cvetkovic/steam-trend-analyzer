@@ -1,4 +1,5 @@
 """FastAPI application main module."""
+import json
 import asyncio
 from datetime import datetime, date
 from fastapi import FastAPI, HTTPException, Path as PathParam, Query
@@ -23,17 +24,20 @@ from .schemas import (
     TagComboItem
 )
 from .recommender import recommend_tags
-from .storage import load_tag_summary, load_tag_month_stats, load_tag_summary, load_tag_month_stats, load_games, load_tag_combo_clusters
+from .storage import load_tag_summary, load_tag_month_stats, load_games, load_tag_combo_clusters
 from .ml_mock import mock_predict_tags
-from .llm_service import generate_trend_response
+from .llm_service import generate_trend_structured_response
 from .response_store import save_trend_response, get_trend_response
 from .analytics import compute_genres_trend_data, compute_deep_data
+from .settings import settings
 
 app = FastAPI(
     title="Steam Tag Recommender API",
     description="API for recommending Steam game tags based on success, trends, and complexity",
     version="1.0.0"
 )
+
+print(f"[LLM] model={settings.PERPLEXITY_MODEL!r} key_set={bool(settings.PERPLEXITY_API_KEY.strip())}")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -155,13 +159,19 @@ async def get_trend(
     revenueExpectedInThousandsOfDollars: int = Query(..., ge=0, le=100000),
 ):
     try:
-        # Wrap entire endpoint in timeout to prevent hanging
         async def _process_trend():
-            # Load tag summary in thread pool to avoid blocking
+            # -------------------------------------------------
+            # 1) LOAD BASE DATA (THREAD POOL)
+            # -------------------------------------------------
             tag_summary = await asyncio.to_thread(load_tag_summary)
             all_tags = sorted(tag_summary["tag"].astype(str).str.strip().unique().tolist())
 
-            # ML prediction (fast, can stay synchronous)
+            games = await asyncio.to_thread(load_games)
+            combo_clusters = await asyncio.to_thread(load_tag_combo_clusters)
+
+            # -------------------------------------------------
+            # 2) ML PREDICTION (FAST)
+            # -------------------------------------------------
             ml_top = mock_predict_tags(
                 preferred_genres=preferredGenres,
                 all_known_tags=all_tags,
@@ -173,44 +183,81 @@ async def get_trend(
                 top_n=10
             )
 
-            primary_tag = ml_top[0][0] if ml_top else (all_tags[0] if all_tags else "Indie")
+            primary_tag = ml_top[0][0] if ml_top else (preferredGenres[0] if preferredGenres else "Indie")
 
-            # Load games in thread pool to avoid blocking
-            games = await asyncio.to_thread(load_games)
+            # -------------------------------------------------
+            # 3) ENRICH ML WITH CLUSTER STATS
+            # -------------------------------------------------
+            combo_map = {}
+            if "tag_combo" in combo_clusters.columns:
+                for _, row in combo_clusters.iterrows():
+                    key = str(row.get("tag_combo", "")).strip().lower()
+                    if key:
+                        combo_map[key] = {
+                            "risk_ratio": float(row.get("risk_ratio", 0.0)),
+                            "trend_delta": float(row.get("trend_delta", 0.0)),
+                            "publisher_dependency": float(row.get("publisher_dependency", 0.0)),
+                            "combo_size": int(row.get("combo_size", 0)),
+                            "weighted_released": float(row.get("weighted_released", 0.0)),
+                            "weighted_profitable": float(row.get("weighted_profitable", 0.0)),
+                        }
 
-            # Deep data for primary tag (wide filters by default; keep it useful)
+            def _norm_combo(s: str) -> str:
+                return ",".join([p.strip().lower() for p in str(s).split(",") if p.strip()])
+
+            ml_enriched = []
+            for combo, prob in ml_top:
+                k = _norm_combo(combo)
+                ml_enriched.append({
+                    "combo": combo,
+                    "probability": float(prob),
+                    "cluster_stats": combo_map.get(k, {})
+                })
+
+            # -------------------------------------------------
+            # 4) ANALYTICS (PARALLEL)
+            # -------------------------------------------------
             today = date.today()
-            default_start = date(2019, 1, 1)
-            
-            # Run compute operations in parallel in thread pool
+            start = date(2019, 1, 1)
+
             deep_task = asyncio.to_thread(
                 compute_deep_data,
                 games=games,
                 tags=[primary_tag],
-                wishlist_min=0, wishlist_max=2_000_000_000,
-                revenue_min=0, revenue_max=2_000_000_000,
-                reviews_min=0, reviews_max=2_000_000_000,
-                start=default_start,
+                wishlist_min=0,
+                wishlist_max=2_000_000_000,
+                revenue_min=0,
+                revenue_max=2_000_000_000,
+                reviews_min=0,
+                reviews_max=2_000_000_000,
+                start=start,
                 end=today
             )
-            
+
             trend_task = asyncio.to_thread(
                 compute_genres_trend_data,
                 games=games,
-                start=default_start,
+                start=start,
                 end=today,
                 profitability_type="wishlists",
                 min_number_for_profitability=1000
             )
-            
-            # Wait for both to complete in parallel
-            deep, (released_points, profitable_points, ratio_points, total_rel, total_prof) = await asyncio.gather(
-                deep_task, trend_task
-            )
 
-            ml_lines = "\n".join([f"- {t}: {p:.3f}" for t, p in ml_top])
+            deep_data, (
+                released_points,
+                profitable_points,
+                ratio_points,
+                total_released,
+                total_profitable,
+            ) = await asyncio.gather(deep_task, trend_task)
+
+            # -------------------------------------------------
+            # 5) BUILD LLM PROMPT
+            # -------------------------------------------------
+            chat_name = f"Trend • team {teamSize} • {primary_tag}"
 
             prompt = (
+                f"chatName: {chat_name}\n\n"
                 f"User constraints:\n"
                 f"- teamSize={teamSize}\n"
                 f"- preferredGenres={preferredGenres}\n"
@@ -218,38 +265,54 @@ async def get_trend(
                 f"- artHeavyLevel={artHeavyLevel}\n"
                 f"- maxDevelopmentTimeInMonths={maxDevelopmentTimeInMonths}\n"
                 f"- revenueExpectedInThousandsOfDollars={revenueExpectedInThousandsOfDollars}\n\n"
-                f"ML predicted tags (mocked):\n{ml_lines}\n\n"
-                f"Primary tag chosen for deep dive: {primary_tag}\n\n"
-                f"Deep data summary (primary tag slice):\n{deep}\n\n"
-                f"Overall market trend stats (all games, wishlists>=1000):\n"
-                f"- released_points={released_points[-12:]}\n"
-                f"- profitable_points={profitable_points[-12:]}\n"
-                f"- ratio_points={ratio_points[-12:]}\n"
-                f"- totalReleased={total_rel}, totalProfitable={total_prof}\n"
+                f"ML predicted niches (with cluster stats):\n"
+                f"{json.dumps(ml_enriched, ensure_ascii=False)}\n\n"
+                f"Primary niche deep data:\n"
+                f"{json.dumps(deep_data, ensure_ascii=False)}\n\n"
+                f"Market trend (last 12 months):\n"
+                f"- released={released_points[-12:]}\n"
+                f"- profitable={profitable_points[-12:]}\n"
+                f"- ratio={ratio_points[-12:]}\n"
+                f"- totals: released={total_released}, profitable={total_profitable}\n"
             )
 
-            # Call LLM with timeout to prevent hanging
-            llm = await generate_trend_response(prompt, timeout=25.0)
-            
-            rec = save_trend_response(chat_response=llm.full_text, action_step_plan=llm.action_plan_text)
-
-            return TrendOutput(chat=rec.chat_response, response_id=rec.response_id)
-
-        # Overall timeout for entire endpoint (120 seconds - increased for large datasets)
-        try:
-            return await asyncio.wait_for(_process_trend(), timeout=120.0)
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=504,
-                detail="Request timeout. The operation took too long. Please try again later."
+            # -------------------------------------------------
+            # 6) LLM → STRUCTURED JSON
+            # -------------------------------------------------
+            llm = await generate_trend_structured_response(
+                prompt=prompt,
+                chat_name=chat_name,
+                timeout=120
             )
+
+            chat_response_str = json.dumps(llm.chat_response_json, ensure_ascii=False)
+
+            rec = save_trend_response(
+                chat_response=chat_response_str,
+                action_step_plan=""
+            )
+
+            # -------------------------------------------------
+            # 7) FINAL RESPONSE (FRONTEND SHAPE)
+            # -------------------------------------------------
+            return TrendOutput(
+                success=True,
+                chatName=llm.chat_name,
+                chatResponse=chat_response_str,
+                responseId=rec.response_id
+            )
+
+        return await asyncio.wait_for(_process_trend(), timeout=120.0)
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Trend computation timed out")
 
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}")
-    except HTTPException:
-        raise
+        raise HTTPException(status_code=500, detail=str(e))
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
 
 
 @app.get("/action-step-plan/{response_id}", response_model=ActionStepPlanOutput)
