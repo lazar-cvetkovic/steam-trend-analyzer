@@ -1,0 +1,3 @@
+python scripts/build_tag_combo_summary.py
+python scripts/cluster_tag_combinations.py
+python scripts/analyze_clusters.py

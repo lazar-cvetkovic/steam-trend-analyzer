@@ -16,7 +16,9 @@ print()
 scripts = [
     "ingest_csv_to_parquet.py",
     "build_tag_month_stats.py",
-    "build_tag_summary.py"
+    "build_tag_summary.py",
+    "build_tag_risk_summary.py",
+    "build_tag_combo_summary.py",
 ]
 
 for script in scripts:
