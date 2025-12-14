@@ -62,14 +62,16 @@ class TagsListResponse(BaseModel):
     """Response for available tags list."""
     tags: List[str]
 
+from typing import Optional, List
+from pydantic import BaseModel, Field
 
 class TrendInput(BaseModel):
-    teamSize: int = Field(ge=1, le=100)
-    preferredGenres: List[str] = Field(default_factory=list)
-    commercialGamesBuiltCount: int = Field(ge=0, le=1000)
-    artHeavyLevel: int = Field(ge=0, le=10, description="0-10")
-    maxDevelopmentTimeInMonths: int = Field(ge=1, le=120)
-    revenueExpectedInThousandsOfDollars: int = Field(ge=0, le=100000)
+    teamSize: Optional[int] = Field(default=1, ge=1, le=100)
+    preferredGenres: Optional[List[str]] = Field(default_factory=list)
+    commercialGamesBuiltCount: Optional[int] = Field(default=0, ge=0, le=1000)
+    artHeavyLevel: Optional[int] = Field(default=0, ge=0, le=10)
+    maxDevelopmentTimeInMonths: Optional[int] = Field(default=6, ge=1, le=120)
+    revenueExpectedInThousandsOfDollars: Optional[int] = Field(default=0, ge=0, le=100000)
 
 class TrendOutput(BaseModel):
     success: bool

@@ -2,8 +2,11 @@
 import json
 import asyncio
 from datetime import datetime, date
-from fastapi import FastAPI, HTTPException, Path as PathParam, Query
+from typing import Optional
+
 import pandas as pd
+from fastapi import FastAPI, HTTPException, Path as PathParam, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from .schemas import (
     HealthResponse,
@@ -14,14 +17,15 @@ from .schemas import (
     TagTimeseriesResponse,
     TimeseriesPoint,
     TagsListResponse,
-    TrendInput, 
-    TrendOutput, ActionStepPlanOutput,
-    ProfitabilityType, GenresTrendDataOutput,
-    DeepDataInput, DeepDataOutput,
+    TrendOutput,
+    ActionStepPlanOutput,
+    ProfitabilityType,
+    GenresTrendDataOutput,
+    DeepDataOutput,
     ClusterListResponse,
     ClusterDetailResponse,
     ClusterSummary,
-    TagComboItem
+    TagComboItem,
 )
 from .recommender import recommend_tags
 from .storage import load_tag_summary, load_tag_month_stats, load_games, load_tag_combo_clusters
@@ -31,10 +35,32 @@ from .response_store import save_trend_response, get_trend_response
 from .analytics import compute_genres_trend_data, compute_deep_data
 from .settings import settings
 
+
+def _to_int(value: Optional[str], default: int) -> int:
+    if value is None:
+        return default
+    s = str(value).strip()
+    if s == "":
+        return default
+    try:
+        return int(float(s))  # tolerates "1.0"
+    except (ValueError, TypeError):
+        return default
+
+
 app = FastAPI(
     title="Steam Tag Recommender API",
     description="API for recommending Steam game tags based on success, trends, and complexity",
-    version="1.0.0"
+    version="1.0.0",
+)
+
+# CORS (Vite dev server)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # dev only; lock down in prod
+    allow_credentials=False,  # must be False with allow_origins=["*"]
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 print(f"[LLM] model={settings.PERPLEXITY_MODEL!r} key_set={bool(settings.PERPLEXITY_API_KEY.strip())}")
@@ -57,27 +83,24 @@ async def recommend(inputs: RecommendationInput):
             top_n=inputs.top_n,
             prefer_tags=inputs.prefer_tags,
             avoid_tags=inputs.avoid_tags,
-            allow_tags=inputs.allow_tags
+            allow_tags=inputs.allow_tags,
         )
-        
+
         recommendation_items = [RecommendationItem(**r) for r in recommendations]
-        
+
         return RecommendationResponse(
             generated_at=datetime.utcnow(),
             inputs=inputs,
             recommendations=recommendation_items,
-            meta=RecommendationMeta(**meta)
+            meta=RecommendationMeta(**meta),
         )
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}"
+            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}",
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/tag/{tag}/timeseries", response_model=TagTimeseriesResponse)
@@ -87,46 +110,32 @@ async def get_tag_timeseries(tag: str = PathParam(..., description="Tag name")):
     """
     try:
         tag_stats = load_tag_month_stats()
-            
-        # Filter by tag (case-insensitive)
-        tag_filtered = tag_stats[
-            tag_stats["tag"].str.lower().str.strip() == tag.lower().strip()
-        ]
-        
+
+        tag_filtered = tag_stats[tag_stats["tag"].str.lower().str.strip() == tag.lower().strip()]
         if len(tag_filtered) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Tag '{tag}' not found in data"
-            )
-        
-        # Sort by year_month
+            raise HTTPException(status_code=404, detail=f"Tag '{tag}' not found in data")
+
         tag_filtered = tag_filtered.sort_values("year_month")
-        
+
         points = [
             TimeseriesPoint(
                 year_month=str(row["year_month"]),
                 released_count=int(row["released_count"]),
-                success_rate=round(float(row["success_rate"]), 4)
+                success_rate=round(float(row["success_rate"]), 4),
             )
             for _, row in tag_filtered.iterrows()
         ]
-        
-        return TagTimeseriesResponse(
-            tag=tag,
-            points=points
-        )
+
+        return TagTimeseriesResponse(tag=tag, points=points)
     except HTTPException:
         raise
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}"
+            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}",
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/tags", response_model=TagsListResponse)
@@ -141,23 +150,37 @@ async def get_tags():
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}"
+            detail=f"Data not found. Please run scripts/build_all.py first. Error: {str(e)}",
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 
 @app.get("/trend", response_model=TrendOutput)
 async def get_trend(
-    teamSize: int = Query(..., ge=1, le=100),
-    preferredGenres: list[str] = Query(default_factory=list),
-    commercialGamesBuiltCount: int = Query(..., ge=0, le=1000),
-    artHeavyLevel: int = Query(..., ge=0, le=10),
-    maxDevelopmentTimeInMonths: int = Query(..., ge=1, le=120),
-    revenueExpectedInThousandsOfDollars: int = Query(..., ge=0, le=100000),
+    teamSize: Optional[str] = Query(None),
+    preferredGenres: Optional[list[str]] = Query(None),
+    commercialGamesBuiltCount: Optional[str] = Query(None),
+    artHeavyLevel: Optional[str] = Query(None),
+    maxDevelopmentTimeInMonths: Optional[str] = Query(None),
+    revenueExpectedInThousandsOfDollars: Optional[str] = Query(None),
 ):
+    # defaults (safe)
+    teamSize_i = _to_int(teamSize, 1)
+    commercialGamesBuiltCount_i = _to_int(commercialGamesBuiltCount, 0)
+    artHeavyLevel_i = _to_int(artHeavyLevel, 0)
+    maxDevelopmentTimeInMonths_i = _to_int(maxDevelopmentTimeInMonths, 6)
+    revenueExpectedInThousandsOfDollars_i = _to_int(revenueExpectedInThousandsOfDollars, 0)
+
+    # enforce bounds manually
+    teamSize_i = max(1, min(100, teamSize_i))
+    commercialGamesBuiltCount_i = max(0, min(1000, commercialGamesBuiltCount_i))
+    artHeavyLevel_i = max(0, min(10, artHeavyLevel_i))
+    maxDevelopmentTimeInMonths_i = max(1, min(120, maxDevelopmentTimeInMonths_i))
+    revenueExpectedInThousandsOfDollars_i = max(0, min(100000, revenueExpectedInThousandsOfDollars_i))
+
+    preferredGenres = preferredGenres or []
+
     try:
         async def _process_trend():
             # -------------------------------------------------
@@ -175,12 +198,12 @@ async def get_trend(
             ml_top = mock_predict_tags(
                 preferred_genres=preferredGenres,
                 all_known_tags=all_tags,
-                team_size=teamSize,
-                commercial_games_built_count=commercialGamesBuiltCount,
-                art_heavy_level=artHeavyLevel,
-                max_dev_months=maxDevelopmentTimeInMonths,
-                revenue_expected_k=revenueExpectedInThousandsOfDollars,
-                top_n=10
+                team_size=teamSize_i,
+                commercial_games_built_count=commercialGamesBuiltCount_i,
+                art_heavy_level=artHeavyLevel_i,
+                max_dev_months=maxDevelopmentTimeInMonths_i,
+                revenue_expected_k=revenueExpectedInThousandsOfDollars_i,
+                top_n=10,
             )
 
             primary_tag = ml_top[0][0] if ml_top else (preferredGenres[0] if preferredGenres else "Indie")
@@ -208,11 +231,13 @@ async def get_trend(
             ml_enriched = []
             for combo, prob in ml_top:
                 k = _norm_combo(combo)
-                ml_enriched.append({
-                    "combo": combo,
-                    "probability": float(prob),
-                    "cluster_stats": combo_map.get(k, {})
-                })
+                ml_enriched.append(
+                    {
+                        "combo": combo,
+                        "probability": float(prob),
+                        "cluster_stats": combo_map.get(k, {}),
+                    }
+                )
 
             # -------------------------------------------------
             # 4) ANALYTICS (PARALLEL)
@@ -231,7 +256,7 @@ async def get_trend(
                 reviews_min=0,
                 reviews_max=2_000_000_000,
                 start=start,
-                end=today
+                end=today,
             )
 
             trend_task = asyncio.to_thread(
@@ -240,7 +265,7 @@ async def get_trend(
                 start=start,
                 end=today,
                 profitability_type="wishlists",
-                min_number_for_profitability=1000
+                min_number_for_profitability=1000,
             )
 
             deep_data, (
@@ -254,17 +279,17 @@ async def get_trend(
             # -------------------------------------------------
             # 5) BUILD LLM PROMPT
             # -------------------------------------------------
-            chat_name = f"Trend • team {teamSize} • {primary_tag}"
+            chat_name = f"Trend • team {teamSize_i} • {primary_tag}"
 
             prompt = (
                 f"chatName: {chat_name}\n\n"
                 f"User constraints:\n"
-                f"- teamSize={teamSize}\n"
+                f"- teamSize={teamSize_i}\n"
                 f"- preferredGenres={preferredGenres}\n"
-                f"- commercialGamesBuiltCount={commercialGamesBuiltCount}\n"
-                f"- artHeavyLevel={artHeavyLevel}\n"
-                f"- maxDevelopmentTimeInMonths={maxDevelopmentTimeInMonths}\n"
-                f"- revenueExpectedInThousandsOfDollars={revenueExpectedInThousandsOfDollars}\n\n"
+                f"- commercialGamesBuiltCount={commercialGamesBuiltCount_i}\n"
+                f"- artHeavyLevel={artHeavyLevel_i}\n"
+                f"- maxDevelopmentTimeInMonths={maxDevelopmentTimeInMonths_i}\n"
+                f"- revenueExpectedInThousandsOfDollars={revenueExpectedInThousandsOfDollars_i}\n\n"
                 f"ML predicted niches (with cluster stats):\n"
                 f"{json.dumps(ml_enriched, ensure_ascii=False)}\n\n"
                 f"Primary niche deep data:\n"
@@ -279,39 +304,28 @@ async def get_trend(
             # -------------------------------------------------
             # 6) LLM → STRUCTURED JSON
             # -------------------------------------------------
-            llm = await generate_trend_structured_response(
-                prompt=prompt,
-                chat_name=chat_name,
-                timeout=120
-            )
+            llm = await generate_trend_structured_response(prompt=prompt, chat_name=chat_name, timeout=120)
 
             chat_response_obj = llm.chat_response_json
             chat_response_str = json.dumps(chat_response_obj, ensure_ascii=False)
 
-            rec = save_trend_response(
-                chat_response=chat_response_str,   # keep store as string if you want
-                action_step_plan=""
-            )
+            rec = save_trend_response(chat_response=chat_response_str, action_step_plan="")
 
             return TrendOutput(
                 success=True,
                 chatName=llm.chat_name,
-                chatResponse=chat_response_obj,    # <-- return object
-                responseId=rec.response_id
+                chatResponse=chat_response_obj,
+                responseId=rec.response_id,
             )
-
 
         return await asyncio.wait_for(_process_trend(), timeout=120.0)
 
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Trend computation timed out")
-
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
-
 
 
 @app.get("/action-step-plan/{response_id}", response_model=ActionStepPlanOutput)
@@ -336,17 +350,20 @@ async def get_genres_trend_data(
             start=startdate,
             end=enddate,
             profitability_type=profitabilityType.value,
-            min_number_for_profitability=minNumberForProtifability
+            min_number_for_profitability=minNumberForProtifability,
         )
         return GenresTrendDataOutput(
             released_games=released_points,
             profitable_games=profitable_points,
             profitability_ratio=ratio_points,
             totalNumberOfReleasedGames=total_rel,
-            totalNumberOfProfitableGames=total_prof
+            totalNumberOfProfitableGames=total_prof,
         )
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
@@ -375,11 +392,14 @@ async def get_deep_data(
             reviews_min=reviewsMin,
             reviews_max=reviewsMax,
             start=startdate,
-            end=enddate
+            end=enddate,
         )
         return DeepDataOutput(**out)
     except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Data not found. Run scripts/build_all.py first. Error: {str(e)}",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
@@ -389,7 +409,7 @@ async def get_market_archetypes(
     min_combos: int = Query(15, ge=1),
     max_avg_risk: float = Query(4.0, ge=0),
     min_trend: float = Query(0.0),
-    max_publisher_dep: float = Query(0.65)
+    max_publisher_dep: float = Query(0.65),
 ):
     df = load_tag_combo_clusters()
 
@@ -407,10 +427,10 @@ async def get_market_archetypes(
     )
 
     filtered = summary[
-        (summary["combos"] >= min_combos) &
-        (summary["avg_risk"] <= max_avg_risk) &
-        (summary["avg_trend"] >= min_trend) &
-        (summary["avg_publisher_dep"] <= max_publisher_dep)
+        (summary["combos"] >= min_combos)
+        & (summary["avg_risk"] <= max_avg_risk)
+        & (summary["avg_trend"] >= min_trend)
+        & (summary["avg_publisher_dep"] <= max_publisher_dep)
     ].sort_values("avg_risk")
 
     return ClusterListResponse(
@@ -426,6 +446,7 @@ async def get_market_archetypes(
             for _, r in filtered.iterrows()
         ]
     )
+
 
 @app.get("/market-archetypes/{cluster_id}", response_model=ClusterDetailResponse)
 async def get_market_archetype(cluster_id: int, top_n: int = Query(15, ge=1, le=100)):
@@ -444,11 +465,7 @@ async def get_market_archetype(cluster_id: int, top_n: int = Query(15, ge=1, le=
         avg_combo_size=float(cluster_df["combo_size"].mean()),
     )
 
-    top = (
-        cluster_df
-        .sort_values("risk_ratio")
-        .head(top_n)
-    )
+    top = cluster_df.sort_values("risk_ratio").head(top_n)
 
     return ClusterDetailResponse(
         cluster=summary,
@@ -461,5 +478,5 @@ async def get_market_archetype(cluster_id: int, top_n: int = Query(15, ge=1, le=
                 combo_size=int(row.combo_size),
             )
             for _, row in top.iterrows()
-        ]
+        ],
     )
