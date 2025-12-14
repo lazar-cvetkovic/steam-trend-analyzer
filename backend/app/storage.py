@@ -10,7 +10,7 @@ from .settings import settings
 _tag_summary_cache: Optional[pd.DataFrame] = None
 _tag_month_stats_cache: Optional[pd.DataFrame] = None
 _tag_complexity_cache: Optional[Dict[str, int]] = None
-
+_games_cache: Optional[pd.DataFrame] = None
 
 def load_tag_summary() -> pd.DataFrame:
     """Load tag summary parquet file with caching."""
@@ -58,3 +58,15 @@ def clear_cache():
     _tag_month_stats_cache = None
     _tag_complexity_cache = None
 
+
+def load_games() -> pd.DataFrame:
+    """Load games parquet file with caching."""
+    global _games_cache
+    if _games_cache is None:
+        if not settings.GAMES_PARQUET.exists():
+            raise FileNotFoundError(
+                f"Games parquet not found at {settings.GAMES_PARQUET}. "
+                "Run scripts/build_all.py first."
+            )
+        _games_cache = pd.read_parquet(settings.GAMES_PARQUET)
+    return _games_cache.copy()
