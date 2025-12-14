@@ -16,7 +16,10 @@ def compute_genres_trend_data(
     profitability_type: str,
     min_number_for_profitability: int
 ) -> tuple[list[dict], list[dict], list[dict], int, int]:
-    df = games.copy()
+    needed = ["release_date_parsed", "estimated_wishlists", "total_reviews", "estimated_revenue"]
+    existing = [c for c in needed if c in games.columns]
+    df = games[existing]
+
     if "release_date_parsed" not in df.columns:
         return [], [], [], 0, 0
 
@@ -75,7 +78,13 @@ def compute_deep_data(
     start: date,
     end: date
 ) -> dict:
-    df = games.copy()
+    needed = [
+        "name", "release_date_parsed", "tags_parsed",
+        "estimated_wishlists", "estimated_revenue", "total_reviews", "price",
+        "supported_languages", "developers", "publishers", "platforms", "categories"
+    ]
+    existing = [c for c in needed if c in games.columns]
+    df = games[existing].copy()
 
     if "release_date_parsed" in df.columns:
         df = df[df["release_date_parsed"].notna()].copy()

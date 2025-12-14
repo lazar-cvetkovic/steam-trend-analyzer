@@ -1,4 +1,5 @@
 """FastAPI application main module."""
+import asyncio
 from datetime import datetime, date
 from fastapi import FastAPI, HTTPException, Path as PathParam, Query
 import pandas as pd
@@ -214,7 +215,18 @@ async def get_trend(
             f"- totalReleased={total_rel}, totalProfitable={total_prof}\n"
         )
 
-        llm = generate_trend_response(prompt)
+        # Call LLM with timeout to prevent hanging
+        try:
+            llm = await asyncio.wait_for(
+                generate_trend_response(prompt, timeout=25.0),
+                timeout=30.0
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=504,
+                detail="LLM service timeout. Please try again later."
+            )
+        
         rec = save_trend_response(chat_response=llm.full_text, action_step_plan=llm.action_plan_text)
 
         return TrendOutput(chat=rec.chat_response, response_id=rec.response_id)

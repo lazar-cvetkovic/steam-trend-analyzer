@@ -54,7 +54,7 @@ def load_tag_summary() -> pd.DataFrame:
                 "Run scripts/build_all.py first."
             )
         _tag_summary_cache = pd.read_parquet(settings.TAG_SUMMARY_PARQUET)
-    return _tag_summary_cache.copy()
+    return _tag_summary_cache
 
 
 def load_tag_month_stats() -> pd.DataFrame:
@@ -67,7 +67,7 @@ def load_tag_month_stats() -> pd.DataFrame:
                 "Run scripts/build_all.py first."
             )
         _tag_month_stats_cache = pd.read_parquet(settings.TAG_MONTH_STATS_PARQUET)
-    return _tag_month_stats_cache.copy()
+    return _tag_month_stats_cache
 
 
 def load_tag_complexity() -> Dict[str, int]:
@@ -101,4 +101,4 @@ def load_games() -> pd.DataFrame:
                 "Run scripts/build_all.py first."
             )
         _games_cache = pd.read_parquet(settings.GAMES_PARQUET)
-    return _games_cache.copy()
+    return _games_cache
