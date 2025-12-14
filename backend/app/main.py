@@ -285,22 +285,21 @@ async def get_trend(
                 timeout=120
             )
 
-            chat_response_str = json.dumps(llm.chat_response_json, ensure_ascii=False)
+            chat_response_obj = llm.chat_response_json
+            chat_response_str = json.dumps(chat_response_obj, ensure_ascii=False)
 
             rec = save_trend_response(
-                chat_response=chat_response_str,
+                chat_response=chat_response_str,   # keep store as string if you want
                 action_step_plan=""
             )
 
-            # -------------------------------------------------
-            # 7) FINAL RESPONSE (FRONTEND SHAPE)
-            # -------------------------------------------------
             return TrendOutput(
                 success=True,
                 chatName=llm.chat_name,
-                chatResponse=chat_response_str,
+                chatResponse=chat_response_obj,    # <-- return object
                 responseId=rec.response_id
             )
+
 
         return await asyncio.wait_for(_process_trend(), timeout=120.0)
 

@@ -156,8 +156,28 @@ async def _call_perplexity_json(prompt: str, timeout: float = 120.0) -> Dict[str
         data = r.json()
         content = data["choices"][0]["message"]["content"]
 
-    # Must be JSON only; still parse defensively
-    return _strip_think_blocks(raw)
+    cleaned = _strip_think_blocks(content)
+
+    # Parse strict JSON
+    try:
+        obj = json.loads(cleaned)
+        if isinstance(obj, dict):
+            return obj
+    except Exception:
+        pass
+
+    # If model returns extra text, try extracting first {...} block
+    m = re.search(r"(?s)\{.*\}", cleaned)
+    if m:
+        try:
+            obj = json.loads(m.group(0))
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            pass
+
+    raise ValueError("LLM did not return valid JSON")
+
 
 
 async def generate_trend_structured_response(prompt: str, chat_name: str, timeout: float = 120.0) -> LlmTrendJsonResult:

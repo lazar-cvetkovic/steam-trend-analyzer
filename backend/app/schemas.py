@@ -1,6 +1,6 @@
 """Pydantic request/response schemas."""
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import date
 from enum import Enum
@@ -74,7 +74,7 @@ class TrendInput(BaseModel):
 class TrendOutput(BaseModel):
     success: bool
     chatName: str
-    chatResponse: str 
+    chatResponse: Dict[str, Any]   # <-- object, not string
     responseId: int
 
 class ActionStepPlanOutput(BaseModel):
