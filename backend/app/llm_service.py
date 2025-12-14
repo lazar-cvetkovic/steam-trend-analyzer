@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-import requests
+import httpx
 
 from .settings import settings
 
@@ -33,7 +33,7 @@ def _extract_action_plan(full_text: str) -> str:
         return full_text.strip()
     return full_text[idx + len(marker):].strip()
 
-def call_perplexity(prompt: str) -> str:
+async def call_perplexity(prompt: str, timeout: float = 30.0) -> str:
     url = f"{settings.PERPLEXITY_BASE_URL.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings.PERPLEXITY_API_KEY}",
@@ -47,14 +47,15 @@ def call_perplexity(prompt: str) -> str:
         ],
         "temperature": 0.2,
     }
-    r = requests.post(url, headers=headers, data=json.dumps(body), timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data["choices"][0]["message"]["content"]
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(url, headers=headers, json=body)
+        r.raise_for_status()
+        data = r.json()
+        return data["choices"][0]["message"]["content"]
 
-def generate_trend_response(prompt: str) -> LlmResult:
+async def generate_trend_response(prompt: str, timeout: float = 30.0) -> LlmResult:
     if settings.PERPLEXITY_API_KEY.strip():
-        text = call_perplexity(prompt)
+        text = await call_perplexity(prompt, timeout=timeout)
     else:
         # Mock response if no API key provided
         text = (
